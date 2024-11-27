@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+ name: rolldice-nodejs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rolldice-nodejs
+  template:
+    metadata:
+      labels:
+        app: rolldice-nodejs
+      annotations:
+        instrumentation.opentelemetry.io/inject-nodejs: "true"
+    spec:
+      containers:
+      - name: app
+        image: rolldice-nodejs:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8084
+

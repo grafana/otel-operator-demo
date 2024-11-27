@@ -1,0 +1,242 @@
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: otel-collector
+spec:
+  image: otel/opentelemetry-collector-contrib:latest
+  serviceAccount: otel-collector
+  env:
+    - name: GRAFANA_CLOUD_OTLP_ENDPOINT
+      value: '<my_endpoint>'
+    - name: GRAFANA_CLOUD_INSTANCE_ID
+      value: '<my_instance_id>'
+    - name: GRAFANA_CLOUD_API_KEY
+      value: '<my_api_key>'
+  config:
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+      hostmetrics:
+        # Optional. Host Metrics Receiver added as an example of Infra Monitoring capabilities of the OpenTelemetry Collector
+        # https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/hostmetricsreceiver
+        scrapers:
+          load: {}
+          memory: {}
+    processors:
+      batch: {}
+        # https://github.com/open-telemetry/opentelemetry-collector/tree/main/processor/batchprocessor
+      resourcedetection:
+        # Enriches telemetry data with resource information from the host
+        # https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourcedetectionprocessor
+        detectors: ['env', 'system']
+        override: false
+      transform/drop_unneeded_resource_attributes:
+        # https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/transformprocessor
+        error_mode: ignore
+        trace_statements:
+          - context: resource
+            statements:
+              - delete_key(attributes, "k8s.pod.start_time")
+              - delete_key(attributes, "os.description")
+              - delete_key(attributes, "os.type")
+              - delete_key(attributes, "process.command_args")
+              - delete_key(attributes, "process.executable.path")
+              - delete_key(attributes, "process.pid")
+              - delete_key(attributes, "process.runtime.description")
+              - delete_key(attributes, "process.runtime.name")
+              - delete_key(attributes, "process.runtime.version")
+        metric_statements:
+          - context: resource
+            statements:
+              - delete_key(attributes, "k8s.pod.start_time")
+              - delete_key(attributes, "os.description")
+              - delete_key(attributes, "os.type")
+              - delete_key(attributes, "process.command_args")
+              - delete_key(attributes, "process.executable.path")
+              - delete_key(attributes, "process.pid")
+              - delete_key(attributes, "process.runtime.description")
+              - delete_key(attributes, "process.runtime.name")
+              - delete_key(attributes, "process.runtime.version")
+        log_statements:
+          - context: resource
+            statements:
+              - delete_key(attributes, "k8s.pod.start_time")
+              - delete_key(attributes, "os.description")
+              - delete_key(attributes, "os.type")
+              - delete_key(attributes, "process.command_args")
+              - delete_key(attributes, "process.executable.path")
+              - delete_key(attributes, "process.pid")
+              - delete_key(attributes, "process.runtime.description")
+              - delete_key(attributes, "process.runtime.name")
+              - delete_key(attributes, "process.runtime.version")
+      transform/add_resource_attributes_as_metric_attributes:
+        # https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/transformprocessor
+        error_mode: ignore
+        metric_statements:
+          - context: datapoint
+            statements:
+              - set(attributes["deployment.environment"], resource.attributes["deployment.environment"])
+              - set(attributes["service.version"], resource.attributes["service.version"])
+
+      k8sattributes:
+        extract:
+          # The attributes provided in 'metadata' will be added to associated resources
+          metadata:
+            - k8s.namespace.name
+            - k8s.pod.name
+            - k8s.deployment.name
+            - k8s.statefulset.name
+            - k8s.daemonset.name
+            - k8s.cronjob.name
+            - k8s.job.name
+            - k8s.node.name
+            - k8s.pod.uid
+            - k8s.pod.start_time
+        pod_association:
+          - sources:
+              # This rule will use the IP from the incoming connection from which the resource is received, and find the matching pod, based on the 'pod.status.podIP' of the observed pods
+              - from: connection
+
+    exporters:
+      otlphttp/grafana_cloud:
+        # https://github.com/open-telemetry/opentelemetry-collector/tree/main/exporter/otlphttpexporter
+        endpoint: '${env:GRAFANA_CLOUD_OTLP_ENDPOINT}'
+        auth:
+          authenticator: basicauth/grafana_cloud
+
+    extensions:
+      basicauth/grafana_cloud:
+        # https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/extension/basicauthextension
+        client_auth:
+          username: '${env:GRAFANA_CLOUD_INSTANCE_ID}'
+          password: '${env:GRAFANA_CLOUD_API_KEY}'
+
+    connectors:
+      grafanacloud:
+        # https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/connector/grafanacloudconnector
+        host_identifiers: ['k8s.node.name']
+
+    service:
+      extensions: [basicauth/grafana_cloud]
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors:
+            [
+              resourcedetection,
+              k8sattributes,
+              transform/drop_unneeded_resource_attributes,
+              batch,
+            ]
+          exporters: [otlphttp/grafana_cloud, grafanacloud]
+        metrics:
+          receivers: [otlp, hostmetrics]
+          processors:
+            [
+              resourcedetection,
+              k8sattributes,
+              transform/drop_unneeded_resource_attributes,
+              transform/add_resource_attributes_as_metric_attributes,
+              batch,
+            ]
+          exporters: [otlphttp/grafana_cloud]
+        metrics/grafanacloud:
+          receivers: [grafanacloud]
+          processors: [batch]
+          exporters: [otlphttp/grafana_cloud]
+        logs:
+          receivers: [otlp]
+          processors:
+            [
+              resourcedetection,
+              k8sattributes,
+              transform/drop_unneeded_resource_attributes,
+              batch,
+            ]
+          exporters: [otlphttp/grafana_cloud]
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: otel-collector
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: otel-collector
+rules:
+  - apiGroups:
+      - ''
+    resources:
+      - events
+      - namespaces
+      - namespaces/status
+      - nodes
+      - nodes/spec
+      - pods
+      - pods/status
+      - replicationcontrollers
+      - replicationcontrollers/status
+      - resourcequotas
+      - services
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - apps
+    resources:
+      - daemonsets
+      - deployments
+      - replicasets
+      - statefulsets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - extensions
+    resources:
+      - daemonsets
+      - deployments
+      - replicasets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - batch
+    resources:
+      - jobs
+      - cronjobs
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - autoscaling
+    resources:
+      - horizontalpodautoscalers
+    verbs:
+      - get
+      - list
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: otel-collector
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: otel-collector
+subjects:
+  - kind: ServiceAccount
+    name: otel-collector
+    namespace: default
+

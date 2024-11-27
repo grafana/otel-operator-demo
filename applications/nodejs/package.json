@@ -1,0 +1,8 @@
+{
+  "name": "rolldice",
+  "version": "1.0.0",
+  "author": "Jorge Creixell <jorge.creixell@grafana.com>",
+  "dependencies": {
+    "express": "^4.21.1"
+  }
+}

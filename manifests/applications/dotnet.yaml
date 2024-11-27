@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+ name: rolldice-dotnet
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rolldice-dotnet
+  template:
+    metadata:
+      labels:
+        app: rolldice-dotnet
+      annotations:
+        instrumentation.opentelemetry.io/inject-dotnet: "true"
+        instrumentation.opentelemetry.io/otel-dotnet-auto-runtime: "linux-x64" # for Linux glibc based images, this is default value and can be omitted
+
+    spec:
+      containers:
+      - name: app
+        image: rolldice-dotnet:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8083
+
