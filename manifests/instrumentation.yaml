@@ -14,7 +14,7 @@ spec:
     - b3
   sampler:
     type: parentbased_traceidratio
-    argument: '0.25'
+    argument: '1.0'
   python:
     env:
       - name: OTEL_EXPORTER_OTLP_ENDPOINT
