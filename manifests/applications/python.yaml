@@ -15,8 +15,10 @@ spec:
         instrumentation.opentelemetry.io/inject-python: "true"
         # instrumentation.opentelemetry.io/otel-python-platform: "glibc" # for Linux musl based images
         instrumentation.opentelemetry.io/otel-python-platform: "musl" # for Linux musl based images
-
-
+        resource.opentelemetry.io/service.name: "dice-python"
+        resource.opentelemetry.io/service.namespace: "game"
+        resource.opentelemetry.io/service.version: "1.2.3"
+        resource.opentelemetry.io/deployment.environment.name: "production"
     spec:
       containers:
       - name: app

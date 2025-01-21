@@ -13,6 +13,10 @@ spec:
         app: rolldice-nodejs
       annotations:
         instrumentation.opentelemetry.io/inject-nodejs: "true"
+        resource.opentelemetry.io/service.name: "dice-nodejs"
+        resource.opentelemetry.io/service.namespace: "game"
+        resource.opentelemetry.io/service.version: "1.2.3"
+        resource.opentelemetry.io/deployment.environment.name: "production"
     spec:
       containers:
       - name: app
