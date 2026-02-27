@@ -13,7 +13,7 @@ services:
       - otel-lgtm
 
   otel-lgtm:
-    image: grafana/otel-lgtm
+    image: grafana/otel-lgtm@sha256:47bda08f5cbfe1096ce2a146ab46b2d1331b654f9037c9797cfe77363ead8078
 
     ports:
       - 3000:3000
